@@ -3,12 +3,12 @@ import os
 import numpy as np
 
 import gymnasium as gym
-from stable_baselines3 import PPO
 from stable_baselines3.common.monitor import Monitor
 from stable_baselines3.common.vec_env import DummyVecEnv
-from stable_baselines3.common.callbacks import BaseCallback, EvalCallback
+from stable_baselines3.common.callbacks import BaseCallback
 from stable_baselines3.common.logger import configure
 
+from algos.causal_ppo import CausalPPO
 from envs.tandem_queue_env import TandemQueueEnv
 from utils.seeding import set_seed
 
@@ -66,7 +66,7 @@ class TensorboardCallback(BaseCallback):
                         for threshold in sorted(self.milestones.keys(), reverse=True):
                             if self.milestones[threshold] is None and avg_recent >= threshold:
                                 self.milestones[threshold] = self.num_timesteps
-                                print(f"[PPO] MILESTONE: Avg return >= {threshold} at step {self.num_timesteps}")
+                                print(f"[Causal-PPO] MILESTONE: Avg return >= {threshold} at step {self.num_timesteps}")
                                 self.logger.record("milestones/steps_to_threshold", self.num_timesteps)
                     
                     # Log episode return
@@ -89,7 +89,7 @@ class TensorboardCallback(BaseCallback):
         if self.log_dir:
             import json
             metrics = {
-                "algorithm": "PPO",
+                "algorithm": "Causal-PPO",
                 "total_steps": self.num_timesteps,
                 "total_episodes": self.episode_count,
                 "cumulative_regret": float(self.cumulative_regret),
@@ -100,74 +100,76 @@ class TensorboardCallback(BaseCallback):
             with open(f"{self.log_dir}/metrics.json", "w") as f:
                 json.dump(metrics, f, indent=2)
             
-            print(f"\n[PPO] Final Metrics:")
+            print(f"\n[Causal-PPO] Final Metrics:")
             print(f"  Cumulative Regret: {self.cumulative_regret:.2f}")
             print(f"  Average Regret: {self.cumulative_regret / max(self.episode_count, 1):.2f}")
             print(f"  Milestones reached: {sum(1 for v in self.milestones.values() if v is not None)}/{len(self.milestones)}")
 
+
 def make_env(seed: int = 0):
     def _init():
         env = TandemQueueEnv(seed=seed)
-        env = Monitor(env)  # episode stats in info, SB3-friendly
+        env = Monitor(env)
         return env
     return _init
+
 
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--total-steps", type=int, default=200_000)
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--log-dir", type=str, default="runs_sb3")
-    parser.add_argument("--eval-freq", type=int, default=10_000)
-    parser.add_argument("--n-eval-episodes", type=int, default=5)
+    parser.add_argument("--log-dir", type=str, default="runs_causal_ppo")
+    parser.add_argument("--cf-weight", type=float, default=0.5,
+                       help="Weight for counterfactual baseline (0=pure PPO, 1=pure CF)")
     parser.add_argument("--device", type=str, default="cpu")
     args = parser.parse_args()
 
     set_seed(args.seed)
 
-    # VecEnv with a single env
+    # Create environment
     env = DummyVecEnv([make_env(args.seed)])
-    eval_env = DummyVecEnv([make_env(args.seed + 1)])
+    
+    # Get environment parameters
+    base_env = env.envs[0].env
+    w0 = base_env.w0
+    w1 = base_env.w1
+    max_queue = base_env.max_queue
 
-    # Create log dir + SB3 logger with TensorBoard
+    # Create log dir + logger with TensorBoard
     os.makedirs(args.log_dir, exist_ok=True)
-    log_path = os.path.join(args.log_dir, "PPO")
+    log_path = os.path.join(args.log_dir, "CausalPPO")
     new_logger = configure(log_path, ["tensorboard", "stdout"])
 
-    model = PPO(
+    # Create Causal-PPO model
+    model = CausalPPO(
         "MlpPolicy",
         env,
+        cf_weight=args.cf_weight,
+        w0=w0,
+        w1=w1,
+        max_queue=max_queue,
         verbose=1,
         tensorboard_log=args.log_dir,
         device=args.device,
-        n_steps=200,  # Match environment episode length for more frequent updates
-        batch_size=64,  # Adjust batch size accordingly
+        n_steps=200,
+        batch_size=50,  # Divisor of 200 to avoid warnings
     )
     model.set_logger(new_logger)
 
     # Custom callback for consistent logging
     tensorboard_callback = TensorboardCallback(log_dir=log_path)
-    
-    eval_callback = EvalCallback(
-        eval_env,
-        best_model_save_path=os.path.join(args.log_dir, "best_model"),
-        log_path=args.log_dir,
-        eval_freq=args.eval_freq,
-        n_eval_episodes=args.n_eval_episodes,
-        deterministic=True,
-        render=False,
-    )
 
-    # SB3's learn will handle rollout collection, training, and TensorBoard logging
+    # Train the model
     model.learn(
         total_timesteps=args.total_steps,
-        tb_log_name="PPO_TandemQueue",
-        callback=[tensorboard_callback, eval_callback],
+        tb_log_name="CausalPPO_TandemQueue",
+        callback=tensorboard_callback,
     )
 
-    model.save(os.path.join(args.log_dir, "ppo_tandemqueue_final"))
+    model.save(os.path.join(args.log_dir, "causal_ppo_tandemqueue_final"))
 
     env.close()
-    eval_env.close()
 
 if __name__ == "__main__":
     main()
+

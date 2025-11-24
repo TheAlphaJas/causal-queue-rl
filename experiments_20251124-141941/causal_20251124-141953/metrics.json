@@ -1,0 +1,11 @@
+{
+  "algorithm": "causal",
+  "total_steps": 3000,
+  "total_episodes": 15,
+  "cumulative_regret": 5242.0,
+  "average_regret": 349.46666666666664,
+  "milestones": {
+    "-600": 2000,
+    "-500": 2200
+  }
+}

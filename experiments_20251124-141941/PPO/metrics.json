@@ -1,0 +1,11 @@
+{
+  "algorithm": "PPO",
+  "total_steps": 3000,
+  "total_episodes": 15,
+  "cumulative_regret": 3878.0,
+  "average_regret": 258.53333333333336,
+  "milestones": {
+    "-600": 2000,
+    "-500": 2000
+  }
+}

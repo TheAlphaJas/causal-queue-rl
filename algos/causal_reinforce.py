@@ -1,6 +1,6 @@
 import torch
 from torch.distributions import Categorical
-from agents.networks import MLPPolicy
+from algos.networks import MLPPolicy
 from utils.counterfactual import compute_counterfactual_rewards
 
 class CausalREINFORCEAgent:

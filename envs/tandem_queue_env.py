@@ -13,6 +13,7 @@ class TandemQueueEnv(gym.Env):
                  w0=1.0,
                  w1=1.0,
                  max_queue=50,
+                 max_episode_steps=200,
                  seed=None):
         super().__init__()
         self.lambda_A = lambda_A
@@ -22,6 +23,7 @@ class TandemQueueEnv(gym.Env):
         self.w0 = w0
         self.w1 = w1
         self.max_queue = max_queue
+        self.max_episode_steps = max_episode_steps
 
         self.observation_space = spaces.Box(
             low=0,
@@ -107,6 +109,6 @@ class TandemQueueEnv(gym.Env):
         self.state = next_state
         self.time += 1
         terminated = False  # continuing task
-        truncated = False
+        truncated = self.time >= self.max_episode_steps  # truncate after max steps
         info = {"noise": noise}
         return next_state.copy(), float(reward), terminated, truncated, info

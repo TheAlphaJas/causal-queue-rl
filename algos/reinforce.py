@@ -1,7 +1,7 @@
 import torch
 import torch.nn.functional as F
 from torch.distributions import Categorical
-from agents.networks import MLPPolicy, ValueNet
+from algos.networks import MLPPolicy, ValueNet
 
 class REINFORCEAgent:
     def __init__(self, obs_dim, n_actions, lr=3e-4, gamma=0.99, device="cpu"):

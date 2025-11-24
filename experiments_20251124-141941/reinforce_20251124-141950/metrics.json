@@ -1,0 +1,10 @@
+{
+  "algorithm": "reinforce",
+  "total_steps": 3000,
+  "total_episodes": 15,
+  "cumulative_regret": 5940.0,
+  "average_regret": 396.0,
+  "milestones": {
+    "-600": 2000
+  }
+}

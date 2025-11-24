@@ -1,0 +1,15 @@
+{
+  "algorithm": "Causal-PPO",
+  "total_steps": 10000,
+  "total_episodes": 50,
+  "cumulative_regret": 5906.0,
+  "average_regret": 118.12,
+  "milestones": {
+    "-600": 2000,
+    "-500": 2000,
+    "-400": 3000,
+    "-350": 5000,
+    "-300": 5400,
+    "-250": 5800
+  }
+}
